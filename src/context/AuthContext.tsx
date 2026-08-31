@@ -22,6 +22,7 @@ interface User {
   email: string;
   website: string;
   location: string;
+  notificationsEnabled?: boolean;
 }
 
 interface AuthContextType {
@@ -40,6 +41,7 @@ interface AuthContextType {
     website: string;
     avatar: string;
   }) => Promise<void>;
+  updateNotificationPreference: (enabled: boolean) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
   googlesignin: () => void;
@@ -128,6 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       displayName,
       avatar: user.photoURL || "https://images.pexels.com/photos/1139743/pexels-photo-1139743.jpeg?auto=compress&cs=tinysrgb&w=400",
       email: user.email,
+      notificationsEnabled: false,
     };
     const res = await axiosInstance.post("/register", newuser);
     if (res.data) {
@@ -179,6 +182,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setIsLoading(false);
   };
+
+  const updateNotificationPreference = async (enabled: boolean) => {
+    if (!user) return;
+
+    setIsLoading(true);
+    const updatedUser: User = { ...user, notificationsEnabled: enabled };
+
+    try {
+      const res = await axiosInstance.patch(
+        `/userupdate/${user.email}`,
+        updatedUser
+      );
+      if (res.data) {
+        setUser(updatedUser);
+        localStorage.setItem("twitter-user", JSON.stringify(updatedUser));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
   const googlesignin = async () => {
     setIsLoading(true);
 
@@ -204,6 +227,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           displayName: firebaseuser.displayName || "User",
           avatar: firebaseuser.photoURL || "https://images.pexels.com/photos/1139743/pexels-photo-1139743.jpeg?auto=compress&cs=tinysrgb&w=400",
           email: firebaseuser.email,
+          notificationsEnabled: false,
         };
 
         const registerRes = await axiosInstance.post("/register", newuser);
@@ -231,6 +255,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         login,
         signup,
         updateProfile,
+        updateNotificationPreference,
         logout,
         isLoading,
         googlesignin,

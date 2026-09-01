@@ -8,7 +8,7 @@ import {
   Link as LinkIcon,
   MoreHorizontal,
   Camera,
-  Settings,
+  Bell,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "./ui/button";
@@ -99,11 +99,24 @@ const tweets: Tweet[] = [
   },
 ];
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, updateNotificationPreference, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("posts");
   const [showEditModal, setShowEditModal] = useState(false);
+  const [notificationError, setNotificationError] = useState("");
 
-  if (!user) return null;
+  const handleNotificationPreferenceChange = async (
+    enabled: boolean
+  ) => {
+    setNotificationError("");
+
+    try {
+      await updateNotificationPreference(enabled);
+    } catch (error) {
+      console.error("Failed to update notification preference:", error);
+      setNotificationError("Unable to save your notification preference. Please try again.");
+    }
+  };
+
   const [tweets, setTweets] = useState<any>([]);
   const [loading, setloading] = useState(false);
   const fetchTweets = async () => {
@@ -120,6 +133,9 @@ export default function ProfilePage() {
   useEffect(() => {
     fetchTweets();
   }, []);
+
+  if (!user) return null;
+
   // Filter tweets by current user
   const userTweets = tweets.filter((tweet: any) => tweet.author._id === user._id);
 
@@ -229,6 +245,38 @@ export default function ProfilePage() {
                 })}
             </span>
           </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-gray-800 bg-gray-950 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex gap-3">
+              <Bell className="mt-0.5 h-5 w-5 text-blue-400" />
+              <div>
+                <h2 className="font-semibold text-white">Keyword notifications</h2>
+                <p className="mt-1 text-sm text-gray-400">
+                  Get browser alerts when a tweet mentions cricket or science.
+                </p>
+              </div>
+            </div>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                className="peer sr-only"
+                checked={user.notificationsEnabled ?? false}
+                disabled={isLoading}
+                onChange={(event) =>
+                  handleNotificationPreferenceChange(event.target.checked)
+                }
+                aria-label="Enable keyword notifications"
+              />
+              <span className="h-6 w-11 rounded-full bg-gray-700 transition peer-checked:bg-blue-500 peer-disabled:cursor-not-allowed peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-5" />
+            </label>
+          </div>
+          {notificationError && (
+            <p className="mt-3 text-sm text-red-400" role="alert">
+              {notificationError}
+            </p>
+          )}
         </div>
       </div>
 

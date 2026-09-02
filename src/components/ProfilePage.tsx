@@ -18,6 +18,10 @@ import TweetCard from "./TweetCard";
 import { Card, CardContent } from "./ui/card";
 import Editprofile from "./Editprofile";
 import axiosInstance from "@/lib/axiosInstance";
+import {
+  requestBrowserNotificationPermission,
+  supportsBrowserNotifications,
+} from "@/lib/keywordNotifications";
 
 interface Tweet {
   id: string;
@@ -110,6 +114,24 @@ export default function ProfilePage() {
     setNotificationError("");
 
     try {
+      if (enabled) {
+        const permission = await requestBrowserNotificationPermission();
+
+        if (permission === "unsupported") {
+          setNotificationError(
+            "Browser notifications are not supported on this device."
+          );
+          return;
+        }
+
+        if (permission !== "granted") {
+          setNotificationError(
+            "Notification permission was not granted. You can enable it in your browser settings."
+          );
+          return;
+        }
+      }
+
       await updateNotificationPreference(enabled);
     } catch (error) {
       console.error("Failed to update notification preference:", error);
@@ -256,6 +278,11 @@ export default function ProfilePage() {
                 <p className="mt-1 text-sm text-gray-400">
                   Get browser alerts when a tweet mentions cricket or science.
                 </p>
+                {!supportsBrowserNotifications() && (
+                  <p className="mt-1 text-sm text-amber-400">
+                    Your browser does not support notifications.
+                  </p>
+                )}
               </div>
             </div>
             <label className="relative inline-flex cursor-pointer items-center">
@@ -263,7 +290,7 @@ export default function ProfilePage() {
                 type="checkbox"
                 className="peer sr-only"
                 checked={user.notificationsEnabled ?? false}
-                disabled={isLoading}
+                disabled={isLoading || !supportsBrowserNotifications()}
                 onChange={(event) =>
                   handleNotificationPreferenceChange(event.target.checked)
                 }

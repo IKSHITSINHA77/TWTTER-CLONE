@@ -1,10 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 import { Card, CardContent } from "./ui/card";
 import LoadingSpinner from "./loading-spinner";
 import TweetCard from "./TweetCard";
 import TweetComposer from "./TweetComposer";
 import axiosInstance from "@/lib/axiosInstance";
+import {
+  containsNotificationKeyword,
+  showKeywordNotification,
+} from "@/lib/keywordNotifications";
+import { useAuth } from "@/context/AuthContext";
 
 interface Tweet {
   id: string;
@@ -86,8 +91,10 @@ const tweets: Tweet[] = [
   },
 ];
 const Feed = () => {
+  const { user } = useAuth();
   const [tweets, setTweets] = useState<any>([]);
   const [loading, setloading] = useState(false);
+  const notifiedTweetIds = useRef(new Set<string>());
   const fetchTweets = async () => {
     try {
       setloading(true);
@@ -102,6 +109,25 @@ const Feed = () => {
   useEffect(() => {
     fetchTweets();
   }, []);
+
+  useEffect(() => {
+    if (!user?.notificationsEnabled) return;
+
+    tweets.forEach((tweet: any) => {
+      const tweetId = tweet._id ?? tweet.id;
+
+      if (
+        !tweetId ||
+        notifiedTweetIds.current.has(tweetId) ||
+        !containsNotificationKeyword(tweet.content ?? "")
+      ) {
+        return;
+      }
+
+      notifiedTweetIds.current.add(tweetId);
+      showKeywordNotification(tweet.content);
+    });
+  }, [tweets, user?.notificationsEnabled]);
   const handlenewtweet = (newtweet: any) => {
     setTweets((prev: any) => [newtweet, ...prev]);
   };

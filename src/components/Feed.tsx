@@ -42,7 +42,7 @@ export const Feed: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const notifiedTweetIds = useRef<Set<string>>(new Set<string>());
 
-  // Notification processor with deduplication check
+  // Notification processor with deduplication check and tweetId anchoring
   const checkAndNotify = useCallback(
     (tweet: Tweet) => {
       if (!user?.notificationsEnabled) return;
@@ -56,13 +56,13 @@ export const Feed: React.FC = () => {
 
       if (containsNotificationKeyword(text)) {
         notifiedTweetIds.current.add(tweetId);
-        showKeywordNotification(text);
+        showKeywordNotification(text, tweetId);
       }
     },
     [user?.notificationsEnabled]
   );
 
-  // Fetch initial tweets from backend
+  // Initial fetch with user-visible loading state
   const fetchTweets = async () => {
     try {
       setLoading(true);
@@ -70,27 +70,60 @@ export const Feed: React.FC = () => {
       const fetchedTweets: Tweet[] = Array.isArray(res.data) ? res.data : [];
       setTweets(fetchedTweets);
 
-      // Check incoming tweets on load
       fetchedTweets.forEach((tweet) => checkAndNotify(tweet));
     } catch (error) {
-      console.error('Error fetching tweets:', error);
+      console.error('Error fetching initial tweets:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  // Background fetcher (runs silently without resetting loading spinners)
+  const fetchLatestTweetsSilently = useCallback(async () => {
+    try {
+      const res = await axiosInstance.get('/post');
+      const fetchedTweets: Tweet[] = Array.isArray(res.data) ? res.data : [];
+
+      setTweets(fetchedTweets);
+      fetchedTweets.forEach((tweet) => checkAndNotify(tweet));
+    } catch (error) {
+      console.error('Background tweet fetch failed:', error);
+    }
+  }, [checkAndNotify]);
+
+  // Initial load
   useEffect(() => {
     fetchTweets();
   }, []);
 
-  // Sync notifications if user enables them after tweets are loaded
+  // Background polling (every 30s) and re-sync on tab focus
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchLatestTweetsSilently();
+    }, 30000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLatestTweetsSilently();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchLatestTweetsSilently]);
+
+  // Sync notifications if user enables them while feed is already loaded
   useEffect(() => {
     if (user?.notificationsEnabled && tweets.length > 0) {
       tweets.forEach((tweet) => checkAndNotify(tweet));
     }
   }, [user?.notificationsEnabled, tweets, checkAndNotify]);
 
-  // Handle new tweet composed locally
+  // Handle locally composed tweets immediately
   const handleNewTweet = (newTweet: Tweet) => {
     setTweets((prev) => [newTweet, ...prev]);
     checkAndNotify(newTweet);
@@ -140,7 +173,11 @@ export const Feed: React.FC = () => {
         ) : (
           tweets.map((tweet) => {
             const key = tweet._id || tweet.id || Math.random().toString();
-            return <TweetCard key={key} tweet={tweet} />;
+            return (
+              <div id={`tweet-${key}`} key={key}>
+                <TweetCard tweet={tweet} />
+              </div>
+            );
           })
         )}
       </div>

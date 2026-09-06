@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Button } from "./ui/button";
 import AuthModal from "./AuthModel";
-import TwitterLogo from "./twitterlogo";
+import TwitterLogo from "./Twitterlogo";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LandingPage() {

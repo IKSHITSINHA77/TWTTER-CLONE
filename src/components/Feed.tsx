@@ -12,6 +12,7 @@ import {
   containsNotificationKeyword,
   showKeywordNotification,
 } from '@/lib/keywordNotifications';
+import { getNotificationChannel } from '@/lib/notificationSync';
 
 export interface Author {
   id: string;
@@ -128,6 +129,23 @@ export const Feed: React.FC = () => {
     setTweets((prev) => [newTweet, ...prev]);
     checkAndNotify(newTweet);
   };
+
+  useEffect(() => {
+  const channel = getNotificationChannel();
+  if (!channel) return;
+
+  const handleMessage = (event: MessageEvent) => {
+    if (event.data?.type === 'TWEET_NOTIFIED' && event.data.tweetId) {
+      notifiedTweetIds.current.add(event.data.tweetId);
+    }
+  };
+
+  channel.addEventListener('message', handleMessage);
+  return () => {
+    channel.removeEventListener('message', handleMessage);
+  };
+}, []);
+
 
   return (
     <div className="min-h-screen">

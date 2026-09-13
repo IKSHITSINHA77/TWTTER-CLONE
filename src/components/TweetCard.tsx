@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
+import { AudioPlayer } from './AudioPlayer';
 import {
   Heart,
   MessageCircle,
@@ -179,6 +180,15 @@ export default function TweetCard({ tweet }: any) {
               >
                 <Share className="h-5 w-5 group-hover:text-blue-400" />
               </Button>
+                  Inside your TweetCard component render block:
+{tweet.audio?.url && (
+  <div className="mt-2">
+    <AudioPlayer src={tweet.audio.url} duration={tweet.audio.duration} />
+  </div>
+)}
+              
+
+
             </div>
           </div>
         </div>

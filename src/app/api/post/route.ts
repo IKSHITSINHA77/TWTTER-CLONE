@@ -1,4 +1,3 @@
-// src/app/api/post/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -16,29 +15,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Server-side enforcement for audio uploads
+    let audioData: { url: string; duration: number; name: string; size: number } | null = null;
+
     if (audio && audio.size > 0) {
-      // 1. Time-Gate Validation: 2:00 PM to 7:00 PM IST (14:00 - 19:00 IST)
+      // 1. IST Time-Gate Validation: strictly 2:00 PM to 7:00 PM IST (14:00 - 19:00 IST)
       const now = new Date();
       const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
-      const istOffsetMinutes = 330; // UTC + 5:30
-      const istDate = new Date(utcTime + istOffsetMinutes * 60000);
+      const istDate = new Date(utcTime + 330 * 60000);
 
       const hours = istDate.getHours();
       const minutes = istDate.getMinutes();
       const totalMinutes = hours * 60 + minutes;
 
-      const startWindow = 14 * 60; // 14:00 (2:00 PM IST)
-      const endWindow = 19 * 60;   // 19:00 (7:00 PM IST)
-
-      if (totalMinutes < startWindow || totalMinutes >= endWindow) {
+      if (totalMinutes < 14 * 60 || totalMinutes >= 19 * 60) {
         return NextResponse.json(
-          { message: "Audio uploads are strictly permitted only between 2:00 PM and 7:00 PM IST." },
+          { message: "Audio tweets can only be uploaded between 2:00 PM and 7:00 PM IST." },
           { status: 403 }
         );
       }
 
-      // 2. File Size Limit: 100 MB max
+      // 2. Strict 100MB File Size Constraint
       const MAX_SIZE_BYTES = 100 * 1024 * 1024;
       if (audio.size > MAX_SIZE_BYTES) {
         return NextResponse.json(
@@ -47,7 +43,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 3. Audio Format Validation
+      // 3. Audio File / Codec Verification
       const allowedMimeTypes = [
         "audio/mpeg",
         "audio/mp3",
@@ -67,19 +63,26 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+
+      // 4. Generate persistent base64 data URL for standalone playback
+      const bytes = await audio.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const base64Audio = `data:${audio.type || "audio/webm"};base64,${buffer.toString("base64")}`;
+
+      audioData = {
+        url: base64Audio,
+        duration: 0,
+        name: audio.name,
+        size: audio.size,
+      };
     }
 
-    // Build the post object
     const newTweet = {
       _id: "tweet_" + Date.now(),
       author: author ? String(author) : "anonymous",
       content: content ? String(content) : "",
       image: image ? String(image) : null,
-      audio: audio && audio.size > 0 ? {
-        name: audio.name,
-        size: audio.size,
-        type: audio.type,
-      } : null,
+      audio: audioData,
       createdAt: new Date().toISOString(),
     };
 

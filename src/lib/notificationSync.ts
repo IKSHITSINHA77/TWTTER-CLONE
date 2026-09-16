@@ -1,19 +1,22 @@
 // src/lib/notificationSync.ts
 
-const CHANNEL_NAME = 'twitter_clone_notifications';
-let channel: BroadcastChannel | null = null;
+let broadcastChannel: BroadcastChannel | null = null;
 
-export const getNotificationChannel = () => {
-  if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return null;
-  if (!channel) {
-    channel = new BroadcastChannel(CHANNEL_NAME);
+export const getNotificationChannel = (): BroadcastChannel | null => {
+  if (typeof window === 'undefined' || !('BroadcastChannel' in window)) {
+    return null;
   }
-  return channel;
+
+  if (!broadcastChannel) {
+    broadcastChannel = new BroadcastChannel('twitter_keyword_notifications');
+  }
+
+  return broadcastChannel;
 };
 
-export const broadcastNotifiedId = (tweetId: string) => {
-  const ch = getNotificationChannel();
-  if (ch) {
-    ch.postMessage({ type: 'TWEET_NOTIFIED', tweetId });
+export const broadcastNotifiedTweet = (tweetId: string): void => {
+  const channel = getNotificationChannel();
+  if (channel) {
+    channel.postMessage({ type: 'TWEET_NOTIFIED', tweetId });
   }
 };

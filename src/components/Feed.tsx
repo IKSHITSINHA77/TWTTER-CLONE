@@ -1,3 +1,4 @@
+// src/components/Feed.tsx
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
@@ -11,21 +12,22 @@ import axiosInstance from '@/lib/axiosInstance';
 import {
   containsNotificationKeyword,
   showKeywordNotification,
-} from '@/lib/keywordNotifications';
+} from '@/lib/keywordNotification';
+import { getNotificationPreference } from '@/lib/notificationService';
 import { getNotificationChannel } from '@/lib/notificationSync';
 
 export interface Author {
   id: string;
-  username: string;
+  username?: string;
   displayName: string;
-  avatar: string;
+  avatar?: string;
   verified?: boolean;
 }
 
 export interface Tweet {
   _id?: string;
   id?: string;
-  author: Author;
+  author: Author | string;
   content: string;
   timestamp?: string;
   createdAt?: string;
@@ -35,6 +37,12 @@ export interface Tweet {
   liked?: boolean;
   retweeted?: boolean;
   image?: string;
+  audio?: {
+    url: string;
+    duration?: number;
+    name?: string;
+    size?: number;
+  } | null;
 }
 
 export const Feed: React.FC = () => {
@@ -42,11 +50,20 @@ export const Feed: React.FC = () => {
   const [tweets, setTweets] = useState<Tweet[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const notifiedTweetIds = useRef<Set<string>>(new Set<string>());
+  const isInitialLoad = useRef<boolean>(true);
+
+  // Determine if notifications are enabled from user profile or fallback storage
+  const areNotificationsEnabled = useCallback(() => {
+    if (typeof user?.notificationsEnabled === 'boolean') {
+      return user.notificationsEnabled;
+    }
+    return getNotificationPreference();
+  }, [user?.notificationsEnabled]);
 
   // Notification processor with deduplication check and tweetId anchoring
   const checkAndNotify = useCallback(
     (tweet: Tweet) => {
-      if (!user?.notificationsEnabled) return;
+      if (!areNotificationsEnabled()) return;
 
       const tweetId = tweet._id ?? tweet.id;
       const text = tweet.content || '';
@@ -60,7 +77,7 @@ export const Feed: React.FC = () => {
         showKeywordNotification(text, tweetId);
       }
     },
-    [user?.notificationsEnabled]
+    [areNotificationsEnabled]
   );
 
   // Initial fetch with user-visible loading state
@@ -71,7 +88,12 @@ export const Feed: React.FC = () => {
       const fetchedTweets: Tweet[] = Array.isArray(res.data) ? res.data : [];
       setTweets(fetchedTweets);
 
-      fetchedTweets.forEach((tweet) => checkAndNotify(tweet));
+      // Seed initial tweet IDs to avoid mass-alerting the user on startup
+      fetchedTweets.forEach((tweet) => {
+        const id = tweet._id ?? tweet.id;
+        if (id) notifiedTweetIds.current.add(id);
+      });
+      isInitialLoad.current = false;
     } catch (error) {
       console.error('Error fetching initial tweets:', error);
     } finally {
@@ -86,7 +108,11 @@ export const Feed: React.FC = () => {
       const fetchedTweets: Tweet[] = Array.isArray(res.data) ? res.data : [];
 
       setTweets(fetchedTweets);
-      fetchedTweets.forEach((tweet) => checkAndNotify(tweet));
+
+      // Only notify new tweets arriving after startup
+      if (!isInitialLoad.current) {
+        fetchedTweets.forEach((tweet) => checkAndNotify(tweet));
+      }
     } catch (error) {
       console.error('Background tweet fetch failed:', error);
     }
@@ -117,35 +143,28 @@ export const Feed: React.FC = () => {
     };
   }, [fetchLatestTweetsSilently]);
 
-  // Sync notifications if user enables them while feed is already loaded
+  // Handle cross-tab notification deduplication
   useEffect(() => {
-    if (user?.notificationsEnabled && tweets.length > 0) {
-      tweets.forEach((tweet) => checkAndNotify(tweet));
-    }
-  }, [user?.notificationsEnabled, tweets, checkAndNotify]);
+    const channel = getNotificationChannel();
+    if (!channel) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'TWEET_NOTIFIED' && event.data.tweetId) {
+        notifiedTweetIds.current.add(event.data.tweetId);
+      }
+    };
+
+    channel.addEventListener('message', handleMessage);
+    return () => {
+      channel.removeEventListener('message', handleMessage);
+    };
+  }, []);
 
   // Handle locally composed tweets immediately
   const handleNewTweet = (newTweet: Tweet) => {
     setTweets((prev) => [newTweet, ...prev]);
     checkAndNotify(newTweet);
   };
-
-  useEffect(() => {
-  const channel = getNotificationChannel();
-  if (!channel) return;
-
-  const handleMessage = (event: MessageEvent) => {
-    if (event.data?.type === 'TWEET_NOTIFIED' && event.data.tweetId) {
-      notifiedTweetIds.current.add(event.data.tweetId);
-    }
-  };
-
-  channel.addEventListener('message', handleMessage);
-  return () => {
-    channel.removeEventListener('message', handleMessage);
-  };
-}, []);
-
 
   return (
     <div className="min-h-screen">
@@ -193,7 +212,7 @@ export const Feed: React.FC = () => {
             const key = tweet._id || tweet.id || Math.random().toString();
             return (
               <div id={`tweet-${key}`} key={key}>
-                <TweetCard tweet={tweet} />
+                <TweetCard tweet={tweet as any} />
               </div>
             );
           })

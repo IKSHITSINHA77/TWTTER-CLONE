@@ -21,7 +21,7 @@ import axiosInstance from "@/lib/axiosInstance";
 import {
   requestBrowserNotificationPermission,
   supportsBrowserNotifications,
-} from "@/lib/keywordNotifications";
+} from "@/lib/keywordNotification";
 
 interface Tweet {
   id: string;

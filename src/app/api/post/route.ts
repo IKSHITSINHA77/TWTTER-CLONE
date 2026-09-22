@@ -1,4 +1,16 @@
+// src/app/api/post/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { canUserPostTweet, SubscriptionTier } from "@/lib/subscriptionConfig";
+
+// In-memory post counter per user identifier: userId -> { count: number, plan: SubscriptionTier }
+export const userPostUsage = new Map<string, { count: number; plan: SubscriptionTier }>();
+
+export const getUserUsage = (userId: string) => {
+  if (!userPostUsage.has(userId)) {
+    userPostUsage.set(userId, { count: 0, plan: "free" });
+  }
+  return userPostUsage.get(userId)!;
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,10 +27,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 1. Subscription posting limit verification
+    const userId = author ? String(author) : "anonymous";
+    const usage = getUserUsage(userId);
+    const postCheck = canUserPostTweet(usage.plan, usage.count);
+
+    if (!postCheck.allowed) {
+      return NextResponse.json(
+        {
+          message: postCheck.message,
+          error: "POST_LIMIT_EXCEEDED",
+          plan: usage.plan,
+          currentCount: usage.count,
+        },
+        { status: 403 }
+      );
+    }
+
     let audioData: { url: string; duration: number; name: string; size: number } | null = null;
 
     if (audio && audio.size > 0) {
-      // 1. IST Time-Gate Validation: strictly 2:00 PM to 7:00 PM IST (14:00 - 19:00 IST)
+      // 2. IST Time-Gate Validation: strictly 2:00 PM to 7:00 PM IST (14:00 - 19:00 IST)
       const now = new Date();
       const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
       const istDate = new Date(utcTime + 330 * 60000);
@@ -34,7 +63,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 2. Strict 100MB File Size Constraint
+      // 3. Strict 100MB File Size Constraint
       const MAX_SIZE_BYTES = 100 * 1024 * 1024;
       if (audio.size > MAX_SIZE_BYTES) {
         return NextResponse.json(
@@ -43,7 +72,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 3. Audio File / Codec Verification
+      // 4. Audio File / Codec Verification
       const allowedMimeTypes = [
         "audio/mpeg",
         "audio/mp3",
@@ -64,7 +93,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 4. Generate persistent base64 data URL for standalone playback
+      // 5. Generate persistent base64 data URL for standalone playback
       const bytes = await audio.arrayBuffer();
       const buffer = Buffer.from(bytes);
       const base64Audio = `data:${audio.type || "audio/webm"};base64,${buffer.toString("base64")}`;
@@ -76,6 +105,10 @@ export async function POST(req: NextRequest) {
         size: audio.size,
       };
     }
+
+    // 6. Increment tweet post count upon passing all checks
+    usage.count += 1;
+    userPostUsage.set(userId, usage);
 
     const newTweet = {
       _id: "tweet_" + Date.now(),

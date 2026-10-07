@@ -28,6 +28,9 @@ import { AudioPreview } from './AudioPreview';
 import { checkAudioUploadTimeGate } from '@/lib/audioTimeGate';
 import { validateAudioFile } from '@/lib/audioValidator';
 import { checkAndTriggerKeywordNotification } from '@/lib/keywordNotification';
+import { AudioLanguageOtpModal } from './AudioLanguageOtpModal';
+import { SUPPORTED_LANGUAGES } from '@/lib/translationService';
+
 
 interface TweetComposerProps {
   onTweetPosted?: (tweet: any) => void;
@@ -177,6 +180,14 @@ export const TweetComposer: React.FC<TweetComposerProps> = ({ onTweetPosted }) =
       return;
     }
 
+    <AudioLanguageOtpModal
+  isOpen={isLangOtpOpen}
+  onClose={() => setIsLangOtpOpen(false)}
+  userEmail={user?.email || 'user@example.com'}
+  targetLanguage="hi"
+  onVerified={handleOtpSuccess}
+/>
+
     try {
       setIsLoading(true);
 
@@ -228,10 +239,50 @@ export const TweetComposer: React.FC<TweetComposerProps> = ({ onTweetPosted }) =
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+    const [audioLanguage, setAudioLanguage] = useState<string>('en');
+    const [isLangOtpOpen, setIsLangOtpOpen] = useState<boolean>(false);
+    const [verifiedAudioLanguages, setVerifiedAudioLanguages] = useState<string[]>(['en']);
+
+    const handleAudioLanguageSelect = (langCode: string) => {
+  if (langCode !== 'en' && !verifiedAudioLanguages.includes(langCode)) {
+    // Requires email OTP validation before unlocking
+    setIsLangOtpOpen(true);
+  } else {
+    setAudioLanguage(langCode);
+  }
+};
+
+    const handleOtpSuccess = (verifiedLang: string) => {
+    setVerifiedAudioLanguages((prev) => [...prev, verifiedLang]);
+    setAudioLanguage(verifiedLang);
+}; 
+
+
+
   if (!user) return null;
 
   return (
     <>
+
+       {audioFile && (
+    <div className="flex items-center gap-2 mt-2 px-3 py-1.5 bg-neutral-900/80 rounded-xl border border-neutral-800 text-xs text-neutral-300">
+    <Globe className="h-4 w-4 text-sky-400 shrink-0" />
+    <span>Audio Language:</span>
+    <select
+      value={audioLanguage}
+      onChange={(e) => handleAudioLanguageSelect(e.target.value)}
+      className="bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-sky-500"
+    >
+      {SUPPORTED_LANGUAGES.map((lang) => (
+        <option key={lang.code} value={lang.code}>
+          {lang.name} ({lang.nativeName})
+          {!verifiedAudioLanguages.includes(lang.code) && lang.code !== 'en' ? ' 🔒 (OTP)' : ''}
+        </option>
+      ))}
+    </select>
+  </div>
+)}
+
       <Card className="bg-black border-gray-800 border-x-0 border-t-0 rounded-none">
         <CardContent className="p-4">
           <div className="flex space-x-4">
@@ -466,5 +517,7 @@ export const TweetComposer: React.FC<TweetComposerProps> = ({ onTweetPosted }) =
     </>
   );
 };
+
+    
 
 export default TweetComposer;

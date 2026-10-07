@@ -1,16 +1,6 @@
 // src/app/api/post/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { canUserPostTweet, SubscriptionTier } from "@/lib/subscriptionConfig";
-
-// In-memory post counter per user identifier: userId -> { count: number, plan: SubscriptionTier }
-export const userPostUsage = new Map<string, { count: number; plan: SubscriptionTier }>();
-
-export const getUserUsage = (userId: string) => {
-  if (!userPostUsage.has(userId)) {
-    userPostUsage.set(userId, { count: 0, plan: "free" });
-  }
-  return userPostUsage.get(userId)!;
-};
+import { canUserPostTweet, getUserUsage, userPostUsage } from "@/lib/subscriptionConfig";
 
 export async function POST(req: NextRequest) {
   try {

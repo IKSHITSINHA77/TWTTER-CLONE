@@ -67,3 +67,13 @@ export const canUserPostTweet = (
     remaining: plan.tweetLimit - currentPostCount,
   };
 };
+
+// Global shared store for tracking usage across API routes
+export const userPostUsage = new Map<string, { count: number; plan: SubscriptionTier }>();
+
+export const getUserUsage = (userId: string) => {
+  if (!userPostUsage.has(userId)) {
+    userPostUsage.set(userId, { count: 0, plan: 'free' });
+  }
+  return userPostUsage.get(userId)!;
+};

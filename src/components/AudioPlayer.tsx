@@ -1,14 +1,26 @@
+// src/components/AudioPlayer.tsx
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { logAnalyticsEvent } from '@/lib/telemetry';
 
-interface AudioPlayerProps {
-  src: string;
+export interface AudioPlayerProps {
+  src?: string;
+  audioUrl?: string;
   duration?: number;
+  fileName?: string;
+  tweetId?: string;
 }
 
-export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, duration: initialDuration }) => {
+export const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  src,
+  audioUrl,
+  duration: initialDuration,
+  fileName,
+  tweetId = 'audio_tweet',
+}) => {
+  const activeSrc = src || audioUrl || '';
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -32,6 +44,8 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, duration: initial
     const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
+      // Telemetry: Log full completion event with listened duration
+      logAnalyticsEvent(tweetId, 'audio_complete', Math.round(audio.duration || duration || 0));
     };
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -43,7 +57,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, duration: initial
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, []);
+  }, [tweetId, duration]);
 
   const togglePlay = () => {
     const audio = audioRef.current;
@@ -53,8 +67,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, duration: initial
       audio.pause();
       setIsPlaying(false);
     } else {
-      audio.play();
-      setIsPlaying(true);
+      audio.play().then(() => {
+        setIsPlaying(true);
+        // Telemetry: Log start/play event
+        logAnalyticsEvent(tweetId, 'audio_play');
+      }).catch((err) => {
+        console.error('Audio playback failed:', err);
+      });
     }
   };
 
@@ -80,16 +99,27 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, duration: initial
   };
 
   return (
-    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 my-3 max-w-lg w-full">
-      <audio ref={audioRef} src={src} preload="metadata" />
+    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 my-2 max-w-lg w-full">
+      <audio ref={audioRef} src={activeSrc} preload="metadata" />
+
+      {fileName && (
+        <p className="text-[11px] text-neutral-400 truncate mb-1.5 font-medium">
+          🎵 {fileName}
+        </p>
+      )}
 
       <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={togglePlay}
           className="w-10 h-10 rounded-full bg-sky-500 hover:bg-sky-400 text-white flex items-center justify-center transition shrink-0"
+          aria-label={isPlaying ? 'Pause audio' : 'Play audio'}
         >
-          {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 fill-current ml-0.5" />}
+          {isPlaying ? (
+            <Pause className="h-5 w-5" />
+          ) : (
+            <Play className="h-5 w-5 fill-current ml-0.5" />
+          )}
         </button>
 
         <div className="flex-1 flex flex-col gap-1">
@@ -112,6 +142,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, duration: initial
           type="button"
           onClick={toggleMute}
           className="text-neutral-400 hover:text-white transition p-1"
+          aria-label={isMuted ? 'Unmute' : 'Mute'}
         >
           {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
         </button>

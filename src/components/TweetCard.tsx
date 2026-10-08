@@ -15,6 +15,7 @@ import {
   Repeat2,
   Share,
   MoreHorizontal,
+  Bookmark,
 } from "lucide-react";
 import { SUPPORTED_LANGUAGES, translateText } from "@/lib/translationService";
 import { useAuth } from "@/context/AuthContext";
@@ -124,6 +125,30 @@ export const TweetCard: React.FC<TweetCardProps> = ({ tweet }) => {
         day: "numeric",
       })
     : "";
+
+  const [isBookmarked, setIsBookmarked] = useState<boolean>(tweet.bookmarked || false);
+const [bookmarkLoading, setBookmarkLoading] = useState<boolean>(false);
+
+const handleToggleBookmark = async (e: React.MouseEvent) => {
+  e.stopPropagation();
+  const nextState = !isBookmarked;
+  setIsBookmarked(nextState); // Optimistic UI
+
+  try {
+    setBookmarkLoading(true);
+    await axiosInstance.post('/bookmarks', {
+      tweetId: tweetstate._id,
+      userId: user?._id || 'anonymous',
+    });
+  } catch (err) {
+    setIsBookmarked(!nextState); // Revert on failure
+  } finally {
+    setBookmarkLoading(false);
+  }
+};
+  
+
+  
 
   return (
     <Card className="bg-black border-neutral-800 border-x-0 border-t-0 rounded-none hover:bg-neutral-950/50 transition-colors">
@@ -280,6 +305,19 @@ export const TweetCard: React.FC<TweetCardProps> = ({ tweet }) => {
               >
                 <Share className="h-4 w-4" />
               </Button>
+
+              <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleToggleBookmark}
+                  disabled={bookmarkLoading}
+                  className={`flex items-center space-x-1.5 p-2 rounded-full hover:bg-sky-500/10 transition ${
+                  isBookmarked ? 'text-sky-400' : 'text-neutral-500 hover:text-sky-400'
+  }`}
+  aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark tweet'}
+>
+  <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-current' : ''}`} />
+</Button>
             </div>
           </div>
         </div>

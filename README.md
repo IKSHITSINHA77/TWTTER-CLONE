@@ -1,36 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VoiceTwitter Clone (45-Day Capstone Project)
 
-## Getting Started
+A feature-complete Twitter/X clone built with Next.js App Router, featuring strict IST-based time gates, audio tweet uploads, multilingual inline translation, email OTP verification, creator analytics, and curated bookmarks.
 
-First, run the development server:
+## Core Features & Business Constraints
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. **Audio Tweets & Verification:**
+   - 100MB file size limit & 5-minute audio duration constraint.
+   - Time-gated uploads: Strictly permitted between **2:00 PM and 7:00 PM IST**.
+   - Email OTP authentication for audio posting and non-default spoken language tagging.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. **Posting Limits & Gated Subscription Payments:**
+   - Free (1 tweet), Bronze (₹100/mo, 3 tweets), Silver (₹300/mo, 5 tweets), Gold (₹1000/mo, unlimited).
+   - Payment Gateway strictly open between **10:00 AM and 11:00 AM IST**.
+   - Automated invoice generation and email dispatch.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. **Multilingual Content Engine:**
+   - In-feed translation supporting Hindi, Spanish, French, German, Tamil, and Bengali.
+   - Per-tweet on-demand language switcher.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. **Advanced Discovery & Analytics:**
+   - Multi-filter search drawer (media type, date ranges, relevance sorting).
+   - Sentiment classification (`positive`, `neutral`, `critical`) and trending topic chips.
+   - Creator Analytics: 24-hour interaction heatmap, audio completion rates, and impression telemetry.
 
-## Learn More
+5. **Bookmarks & Curation:**
+   - Custom folder categorization.
+   - Markdown research digests and JSON data exports.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Tech Stack
+- **Framework:** Next.js (App Router, Server Actions, Route Handlers)
+- **Styling:** Tailwind CSS, Lucide Icons, Radix UI
+- **Networking:** Axios, Fetch API

@@ -1,95 +1,96 @@
 // src/app/api/translate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-const MOCK_DICTIONARY: Record<string, Record<string, string>> = {
-  hi: {
-    hello: 'नमस्ते',
-    cricket: 'क्रिकेट',
-    science: 'विज्ञान',
-    welcome: 'स्वागत हे',
-    world: 'दुनिया',
-  },
-  es: {
-    hello: 'hola',
-    cricket: 'críquet',
-    science: 'ciencia',
-    welcome: 'bienvenido',
-    world: 'mundo',
-  },
-  fr: {
-    hello: 'bonjour',
-    cricket: 'cricket',
-    science: 'science',
-    welcome: 'bienvenue',
-    world: 'monde',
-  },
-  de: {
-    hello: 'hallo',
-    cricket: 'cricket',
-    science: 'wissenschaft',
-    welcome: 'willkommen',
-    world: 'welt',
-  },
-  ta: {
-    hello: 'வணக்கம்',
-    cricket: 'கிரிக்கெட்',
-    science: 'அறிவியல்',
-    welcome: 'வரவேற்பு',
-    world: 'உலகம்',
-  },
-  bn: {
-    hello: 'হ্যালো',
-    cricket: 'ক্রিকেট',
-    science: 'বিজ্ঞান',
-    welcome: 'স্বাগতম',
-    world: 'বিশ্ব',
-  },
-};
+// In-memory OTP storage for language switches: identifier -> { otp, expiresAt, targetLang }
+const languageOtpStore = new Map<string, { otp: string; expiresAt: number; targetLang: string }>();
 
 export async function POST(req: NextRequest) {
   try {
-    const { text, targetLang } = await req.json();
+    const body = await req.json();
+    const { action, targetLang, email, phone, otp } = body;
 
-    if (!text || !targetLang) {
-      return NextResponse.json(
-        { message: 'Missing text or targetLang parameter.' },
-        { status: 400 }
-      );
+    // 1. Dispatch OTP
+    if (action === 'REQUEST_OTP') {
+      if (!targetLang) {
+        return NextResponse.json({ message: 'Target language is required.' }, { status: 400 });
+      }
+
+      if (targetLang === 'en') {
+        return NextResponse.json({ success: true, message: 'English does not require verification.' });
+      }
+
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = Date.now() + 5 * 60 * 1000;
+
+      if (targetLang === 'fr') {
+        // French strictly requires Email OTP
+        if (!email) {
+          return NextResponse.json({ message: 'Email address is required for French language verification.' }, { status: 400 });
+        }
+
+        languageOtpStore.set(email.toLowerCase(), { otp: generatedOtp, expiresAt, targetLang });
+
+        console.log(`\n========================================`);
+        console.log(`📧 [EMAIL OTP FOR FRENCH LANGUAGE SWITCH]`);
+        console.log(`To: ${email}`);
+        console.log(`Verification OTP: ${generatedOtp} (Valid for 5 mins)`);
+        console.log(`========================================\n`);
+
+        return NextResponse.json({
+          success: true,
+          verificationType: 'email',
+          destination: email,
+          message: `Verification code sent to registered email ${email}.`,
+        });
+      } else {
+        // Spanish, Hindi, Portuguese, Chinese require Phone OTP
+        const contactPhone = phone || '+91-9876543210';
+        languageOtpStore.set(contactPhone, { otp: generatedOtp, expiresAt, targetLang });
+
+        console.log(`\n========================================`);
+        console.log(`📱 [SMS PHONE OTP FOR ${targetLang.toUpperCase()} LANGUAGE SWITCH]`);
+        console.log(`To Mobile: ${contactPhone}`);
+        console.log(`Verification OTP: ${generatedOtp} (Valid for 5 mins)`);
+        console.log(`========================================\n`);
+
+        return NextResponse.json({
+          success: true,
+          verificationType: 'phone',
+          destination: contactPhone,
+          message: `Verification code sent to registered mobile number ${contactPhone}.`,
+        });
+      }
     }
 
-    if (targetLang === 'en') {
+    // 2. Verify OTP
+    if (action === 'VERIFY_OTP') {
+      const identifier = (targetLang === 'fr' ? email?.toLowerCase() : phone) || '+91-9876543210';
+      const record = languageOtpStore.get(identifier);
+
+      if (!record) {
+        return NextResponse.json({ message: 'No pending OTP request found.' }, { status: 400 });
+      }
+
+      if (Date.now() > record.expiresAt) {
+        languageOtpStore.delete(identifier);
+        return NextResponse.json({ message: 'Verification OTP has expired.' }, { status: 400 });
+      }
+
+      if (record.otp !== otp?.trim()) {
+        return NextResponse.json({ message: 'Invalid verification code.' }, { status: 400 });
+      }
+
+      languageOtpStore.delete(identifier);
       return NextResponse.json({
-        translatedText: text,
-        originalText: text,
-        targetLang,
+        success: true,
+        language: record.targetLang,
+        message: 'Language preference verified and applied successfully.',
       });
     }
 
-    let translated = text;
-    const langDict = MOCK_DICTIONARY[targetLang];
-
-    if (langDict) {
-      Object.entries(langDict).forEach(([eng, replacement]) => {
-        const regex = new RegExp(`\\b${eng}\\b`, 'gi');
-        translated = translated.replace(regex, replacement);
-      });
-    }
-
-    // If no direct words were matched, format as target-language localized output
-    if (translated === text) {
-      translated = `[${targetLang.toUpperCase()}] ${text}`;
-    }
-
-    return NextResponse.json({
-      translatedText: translated,
-      originalText: text,
-      targetLang,
-    });
+    return NextResponse.json({ message: 'Invalid action.' }, { status: 400 });
   } catch (error) {
-    console.error('API Translation error:', error);
-    return NextResponse.json(
-      { message: 'Failed to translate content.' },
-      { status: 500 }
-    );
+    console.error('Language verification error:', error);
+    return NextResponse.json({ message: 'Failed to process language verification.' }, { status: 500 });
   }
 }
